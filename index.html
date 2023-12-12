@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      var width = 700,
+        height = 580;
+
+      var svg = d3
+        .select("body")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      // On rajoute un groupe englobant toute la visualisation pour plus tard
+      var g = svg.append("g");
+
+      // Autres projections : geoMercator, geoNaturalEarth1, ...
+      // https://github.com/d3/d3-geo/blob/master/README.md
+      var projection = d3
+        .geoAlbersUsa()
+        .translate([width / 2, height / 2])
+        .scale([500]);
+
+      // On définit une échelle de couleur
+      // via https://observablehq.com/@d3/color-schemes?collection=@d3/d3-scale-chromatic
+      var color = d3
+        .scaleQuantize()
+        .range(["#edf8e9", "#bae4b3", "#74c476", "#31a354", "#006d2c"]);
+
+      var path = d3.geoPath().projection(projection);
+
+      var jourChoisi = "2021-09-12"; // pour demarrer on code en dur un jour a afficher
+      // Chargement des données
+      d3.csv("covid.csv").then(function (data) {
+        // Filtrer les données
+        var cleanData = data.filter(function (row) {
+          return row.sexe == 0;
+        });
+
+        color.domain([0, 2000]);
+
+        d3.json("departements-version-simplifiee.geojson").then(function (json) {
+          // On fusionne les donnees avec le GeoJSON des departements
+          for (var j = 0; j < json.features.length; j++) {
+            var departement = json.features[j];
+
+            // find permet d'eviter de faire une boucle sur toutes les donnees
+            var jourDepChoisi = cleanData.find(function (row) {
+              return (
+                row.dep == departement.properties.code && row.jour == jourChoisi
+              );
+            });
+            json.features[j].properties.value = jourDepChoisi
+              ? +jourDepChoisi.hosp
+              : 0;
+          }
+
+          // On dessine
+          drawMap(0);
+        });
+      });
+
+      // Fonction pour dessiner la carte
+      function drawMap(currentDay) {
+        var carte = g.selectAll("path").data(json.features);
+
+        carte
+          .join("path")
+          .attr("d", path)
+          .style("fill", function (d) {
+            var value = d.properties.value;
+            return value ? color(value) : "#ccc";
+          });
+      }
+    </script>
+  </body>
+</html>
